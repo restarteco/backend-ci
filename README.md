@@ -20,3 +20,9 @@ jobs:
           token: ${{ secrets.ACCESS_TOKEN_RECTOR }} # default ${{ github.token }}
           auth_json: ${{ secrets.ACCESS_AUTH }} # optional
 ```
+
+## TODO
+
+ - improve doc
+ - make it more configurable
+ - middle finger is to agressive ?
