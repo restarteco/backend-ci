@@ -17,7 +17,6 @@ jobs:
     steps:
       - uses: restarteco/rector-commit-comment@v1.2
         with:
-          # Must be used to trigger workflow after push
-          token: ${{ secrets.ACCESS_TOKEN_RECTOR }}
-          auth_json: ${{ secrets.ACCESS_AUTH }}
+          token: ${{ secrets.ACCESS_TOKEN_RECTOR }} # default ${{ github.token }}
+          auth_json: ${{ secrets.ACCESS_AUTH }} # optional
 ```
