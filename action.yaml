@@ -6,7 +6,7 @@ inputs:
     default: ${{ github.token }}
   auth_json:
     description: 'The auth.json (for other bundles)'
-    default: ${{ secrets.ACCESS_AUTH }}
+    default: ''
 runs:
   using: 'composite'
   steps:
@@ -23,23 +23,30 @@ runs:
           coverage: none
 
       - name: Add AUTH JSON
+        shell: bash
         run: echo '${{ inputs.auth_json }}' > auth.json
 
       - run: composer install --no-progress --ansi
+        shell: bash
+
 
       ## First run Rector without --dry-run, it would stop the process with exit 1 here
       - run: vendor/bin/rector process --ansi --no-progress-bar > rector.log
+        shell: bash
         id: rector-check
 
       - name: Exit for Rector modified files
+        shell: bash
         id: rector-exit-check
         run: echo ::set-output name=error::$(if [ `wc -l rector.log | awk '{print $1}'` -ge "6" ]; then echo "true"; else echo "false"; fi)
 
       - name: Message Length
+        shell: bash
         id: rector-length-check
         run: echo ::set-output name=length::$(if [ `wc -m rector.log | awk '{print $1}'` -ge "64000" ]; then echo "false"; else echo "true"; fi)
 
       - id: get-comment-body
+        shell: bash
         if:  steps.rector-exit-check.outputs.error == 'true'
         run: |
           body=$(cat rector.log)
@@ -111,6 +118,7 @@ runs:
             </p></details>
 
       - name: Stop Action -> Rector changes 
+        shell: bash
         if: steps.rector-exit-check.outputs.error == 'true'
         run: |
           cat rector.log
