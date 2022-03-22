@@ -42,6 +42,7 @@ runs:
 
     - name: Get composer cache directory
       id: composer-cache-dir
+      shell: bash
       run: echo "::set-output name=dir::$(composer config cache-files-dir)"
       working-directory: ./main
 
@@ -55,6 +56,7 @@ runs:
 
     - name: Frontend - Get yarn cache directory
       id: yarn-cache-dir-path
+      shell: bash
       run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
       working-directory: ./frontend
 
@@ -66,11 +68,14 @@ runs:
         key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
         restore-keys: |
           ${{ runner.os }}-yarn-
+
     - name: Install Composer dependencies
+      shell: bash
       run: composer install
       working-directory: ./main
 
     - name: Frontend - Install dependencies
+      shell: bash
       run: yarn install --immutable
       working-directory: ./frontend
 
@@ -80,10 +85,12 @@ runs:
       working-directory: ./main
 
     - name: Frontend - Generate code from GraphQL
+      shell: bash
       # Frontend package MUST be named as @reparcar/network-{MS_name}
       run: yarn workspace @reparcar/network-${{ github.event.repository.name }} graphql-gen-ci ../../../schema.graphql
       working-directory: ./frontend
 
     - name: Frontend - Check types
+      shell: bash
       run: yarn workspaces foreach run type-check
       working-directory: ./frontend
