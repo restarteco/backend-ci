@@ -1,0 +1,89 @@
+name: CI / Test frontend integrity
+description: Check frontend integrity
+inputs:
+  token:
+    description: 'The GitHub authentication token'
+    default: ${{ github.token }}
+  auth_json:
+    description: 'The auth.json (for other bundles)'
+    default: ''
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        path: ./main
+
+    - name: Add git auth JSON file
+      shell: bash
+      run: echo '${{ inputs.auth_json }}' > auth.json
+      working-directory: ./main
+
+    - name: Checkout frontend
+      uses: actions/checkout@v3
+      with:
+        repository: restarteco/reparcar-front-next
+        token: ${{ inputs.token }}
+        path: ./frontend
+
+    - name: Use Node 12.22.6
+      uses: actions/setup-node@v2
+      with:
+        node-version: '12.22.6'
+
+    - name: Setup PHP, extensions and composer with shivammathur/setup-php
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: 8.1
+        extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, dom, filter, gd, iconv, json, mbstring
+      env:
+        update: true
+
+    - name: Get composer cache directory
+      id: composer-cache-dir
+      run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+      working-directory: ./main
+
+    - name: Cache composer dependencies
+      uses: actions/cache@v1
+      id: composer-cache
+      with:
+        path: ${{ steps.composer-cache-dir.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-
+
+    - name: Frontend - Get yarn cache directory
+      id: yarn-cache-dir-path
+      run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+      working-directory: ./frontend
+
+    - name: Frontend - Cache dependencies
+      uses: actions/cache@v2
+      id: yarn-cache
+      with:
+        path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+        key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-yarn-
+    - name: Install Composer dependencies
+      run: composer install
+      working-directory: ./main
+
+    - name: Frontend - Install dependencies
+      run: yarn install --immutable
+      working-directory: ./frontend
+
+    - name: Export GraphQL types
+      shell: bash
+      run: echo $(bin/console api:graphql:export) > ../schema.graphql
+      working-directory: ./main
+
+    - name: Frontend - Generate code from GraphQL
+      # Frontend package MUST be named as @reparcar/network-{MS_name}
+      run: yarn workspace @reparcar/network-${{ github.event.repository.name }} graphql-gen-ci ../../../schema.graphql
+      working-directory: ./frontend
+
+    - name: Frontend - Check types
+      run: yarn workspaces foreach run type-check
+      working-directory: ./frontend
