@@ -1,4 +1,4 @@
-name: 'Rector commit Comment'
+name: CI / Rector
 description: 'Create a comment for a commit on GitHub when rector request changes'
 inputs:
   token:
