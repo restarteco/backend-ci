@@ -10,6 +10,9 @@ inputs:
   database_url:
     description: 'The database url'
     default: ''
+  auth_json:
+    description: 'the content of auth.json file'
+    default: ''
 runs:
   using: 'composite'
   steps:
@@ -49,7 +52,9 @@ runs:
 
     #- name: Yarn build
     #  run: yarn run encore production
-
+    - name: Add AUTH JSON
+      shell: bash
+      run: echo '${{ inputs.auth_json }}' > auth.json
     # —— Composer 🧙‍️ —————————————————————————————————————————————————————————
     - name: Validate composer.json and composer.lock
       run: composer validate

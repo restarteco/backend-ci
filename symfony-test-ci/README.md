@@ -28,4 +28,5 @@ jobs:
         with:
           es_port: 9209 # default 9209
           database_url: mysql://root:root@127.0.0.1:3306/your_database
+          auth_json: ${{ secrets.ACCESS_AUTH }}
 ```
