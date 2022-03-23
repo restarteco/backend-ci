@@ -9,8 +9,7 @@ name: CI / Test frontend integrity
 on:
   push:
     branches: [ master ]
-  pull_request:
-    branches: [ master ]
+  pull_request: null
 
 jobs:
   e2e-ci:
