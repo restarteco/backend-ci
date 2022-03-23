@@ -12,7 +12,6 @@ inputs:
     default: ''
 runs:
   using: 'composite'
-  name: Symfony 5.4 (PHP 8.1)
   steps:
     # —— Setup Github actions 🐙 —————————————————————————————————————————————
     # https://github.com/actions/checkout (official)
