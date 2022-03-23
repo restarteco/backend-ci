@@ -1,0 +1,107 @@
+# https://help.github.com/en/actions
+name: Full CI process for Symfony 5
+
+inputs:
+  es_port:
+    description: 'The elastic search port'
+    default: 9209
+  database_url:
+    description: 'The database url'
+    default: ''
+jobs:
+  symfony:
+    name: Symfony 5.4 (PHP 8.1)
+    # https://hub.docker.com/_/ubuntu/
+    runs-on: ubuntu-20.04
+    services:
+      # https://docs.docker.com/samples/library/mysql/
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+    strategy:
+      fail-fast: true
+    steps:
+      # —— Setup Github actions 🐙 —————————————————————————————————————————————
+      # https://github.com/actions/checkout (official)
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      # https://github.com/shivammathur/setup-php (community)
+      - name: Setup PHP, extensions and composer with shivammathur/setup-php
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, dom, filter, gd, iconv, json, mbstring
+        env:
+          update: true
+
+      - name: Check PHP Version
+        run: php -v
+
+      # https://github.com/zhulik/redis-action (community)
+      - name: Setup Redis with zhulik/redis-action
+        uses: zhulik/redis-action@1.1.0
+        with:
+          redis version: '5'
+      # —— Yarn 🐱 ————————————————————————————————————————————————————————————
+      - name: Yarn install
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+          #registry-url: npm.fontawesome.com
+      - run: yarn install
+        #env:
+        #NODE_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
+
+      #- name: Yarn build
+      #  run: yarn run encore production
+
+      # —— Composer 🧙‍️ —————————————————————————————————————————————————————————
+      - name: Validate composer.json and composer.lock
+        run: composer validate
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v1
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install
+
+      # —— Symfony 🎵 ——————————————————————————————————————————————————————————
+      - name: Check Symfony requirements
+        run: vendor/bin/requirements-checker
+
+      - name: Check the Symfony console
+        run: |
+          bin/console about
+
+      ## —— JWT 💫 —————————————————————————————————————————————————————————————
+      - name: Generate the SSL keys
+        run: bin/console lexik:jwt:generate-keypair
+
+      ## —— DATABASE —————————————————————————————————————————————————————————————
+      - name: Create DB
+        run: bin/console doctrine:database:create --no-interaction
+
+      ## —— DATABASE SCHEMA —————————————————————————————————————————————————————————————
+      - name: Create DB schema
+        run: bin/console doctrine:migrations:migrate --no-interaction
+
+      ## —— Tests ✅ ———————————————————————————————————————————————————————————
+      # We use the dev env here
+      - name: Load Doctrine fixtures
+        run: bin/console hautelook:fixtures:load --no-interaction
+
+      - name: Run functionnal and unit tests
+        run: vendor/bin/phpunit
