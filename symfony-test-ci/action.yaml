@@ -1,6 +1,8 @@
 # https://help.github.com/en/actions
 name: Full CI process for Symfony 5
-
+branding:
+  icon: 'award'
+  color: red
 inputs:
   es_port:
     description: 'The elastic search port'
@@ -11,17 +13,6 @@ inputs:
 runs:
   using: 'composite'
   name: Symfony 5.4 (PHP 8.1)
-  services:
-    # https://docs.docker.com/samples/library/mysql/
-    mysql:
-      image: mysql:5.7
-      env:
-        MYSQL_ROOT_PASSWORD: root
-      ports:
-        - 3306:3306
-      options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
-  strategy:
-    fail-fast: true
   steps:
     # —— Setup Github actions 🐙 —————————————————————————————————————————————
     # https://github.com/actions/checkout (official)
@@ -39,6 +30,7 @@ runs:
 
     - name: Check PHP Version
       run: php -v
+      shell: bash
 
     # https://github.com/zhulik/redis-action (community)
     - name: Setup Redis with zhulik/redis-action
@@ -52,6 +44,7 @@ runs:
         node-version: '14'
         #registry-url: npm.fontawesome.com
     - run: yarn install
+      shell: bash
       #env:
       #NODE_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
 
@@ -61,10 +54,12 @@ runs:
     # —— Composer 🧙‍️ —————————————————————————————————————————————————————————
     - name: Validate composer.json and composer.lock
       run: composer validate
+      shell: bash
 
     - name: Get composer cache directory
       id: composer-cache
       run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+      shell: bash
 
     - name: Cache composer dependencies
       uses: actions/cache@v1
@@ -75,31 +70,39 @@ runs:
 
     - name: Install Composer dependencies
       run: composer install
+      shell: bash
 
     # —— Symfony 🎵 ——————————————————————————————————————————————————————————
     - name: Check Symfony requirements
       run: vendor/bin/requirements-checker
+      shell: bash
 
     - name: Check the Symfony console
       run: |
         bin/console about
+      shell: bash
 
     ## —— JWT 💫 —————————————————————————————————————————————————————————————
     - name: Generate the SSL keys
       run: bin/console lexik:jwt:generate-keypair
+      shell: bash
 
     ## —— DATABASE —————————————————————————————————————————————————————————————
     - name: Create DB
       run: bin/console doctrine:database:create --no-interaction
+      shell: bash
 
     ## —— DATABASE SCHEMA —————————————————————————————————————————————————————————————
     - name: Create DB schema
       run: bin/console doctrine:migrations:migrate --no-interaction
+      shell: bash
 
     ## —— Tests ✅ ———————————————————————————————————————————————————————————
     # We use the dev env here
     - name: Load Doctrine fixtures
       run: bin/console hautelook:fixtures:load --no-interaction
+      shell: bash
 
     - name: Run functionnal and unit tests
       run: vendor/bin/phpunit
+      shell: bash
