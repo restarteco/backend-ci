@@ -23,7 +23,7 @@ runs:
     - name: get frontend branch from pr comment
       shell: bash
       id: get-frontend-branch
-      run: "echo ::set-output name=frontend-branch::$(BRANCH_REG=$(echo $PRBODY|tr -d '\n' |sed -E 's/(.*)front branch: \[(.*)\](.*)/\2/g');if [[ $BRANCH_REG =~ [0-z]+ ]]; then echo $BRANCH_REG; else echo 'master'; fi)"
+      run: 'echo ::set-output name=frontend-branch::$(BRANCH_REG=$(echo $PRBODY|tr -d ''\n'' |sed -E ''s/(.*)front branch: \[(.*)\](.*)/\2/g'');if [[ $BRANCH_REG =~ [0-z]+ ]]; then echo $BRANCH_REG; else echo ''master''; fi)'
       env:
         PRBODY: ${{ steps.PR.outputs.pr_body }}
 
