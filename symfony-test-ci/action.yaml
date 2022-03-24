@@ -89,14 +89,14 @@ runs:
 
     ## —— DATABASE —————————————————————————————————————————————————————————————
     - name: Create DB
-      run: bin/console doctrine:database:create --no-interaction
+      run: bin/console doctrine:database:create --no-interaction --env="test"
       shell: bash
       env:
         DATABASE_URL: ${{inputs.database_url}}
 
     ## —— DATABASE SCHEMA —————————————————————————————————————————————————————————————
     - name: Create DB schema
-      run: bin/console doctrine:migrations:migrate --no-interaction
+      run: bin/console doctrine:migrations:migrate --no-interaction --env="test"
       shell: bash
       env:
         DATABASE_URL: ${{inputs.database_url}}
@@ -104,7 +104,7 @@ runs:
     ## —— Tests ✅ ———————————————————————————————————————————————————————————
     # We use the dev env here
     - name: Load Doctrine fixtures
-      run: bin/console hautelook:fixtures:load --no-interaction
+      run: bin/console hautelook:fixtures:load --no-interaction --env="test"
       shell: bash
       env:
         DATABASE_URL: ${{inputs.database_url}}
