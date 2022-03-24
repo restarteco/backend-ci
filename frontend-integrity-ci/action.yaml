@@ -33,6 +33,10 @@ runs:
       env:
         PRBODY: ${{ steps.PR.outputs.pr_body }}
 
+    - name: Create commit comment
+      uses: peter-evans/commit-comment@v1
+      with:
+        body: Frontend integrity CI runs using branch reparcar-frontend-next/**${{ steps.get-frontend-branch.outputs.frontend-branch }}**
     - name: Checkout frontend
       uses: actions/checkout@v3
       with:
