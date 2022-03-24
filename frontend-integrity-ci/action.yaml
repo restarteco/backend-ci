@@ -20,23 +20,23 @@ runs:
       run: echo '${{ inputs.auth_json }}' > auth.json
       working-directory: ./main
 
+    - uses: 8BitJonny/gh-get-current-pr@1.4.0
+      id: PR
+      with:
+        github-token: ${{ inputs.token }}
+        sha: ${{ github.event.pull_request.head.sha }}
+        filterOutClosed: true
     - name: get frontend branch from pr comment
       shell: bash
       id: get-frontend-branch
-      run: >-
-        echo ::set-output name=frontend-branch::$(
-          BRANCH_REG=$(
-            echo $PRBODY
-            |tr -d '\n'
-            |sed -E 's/(.*)front branch: \[(.*)\](.*)/\2/g'
-          );
-          if [[ $BRANCH_REG =~ [0-z]+ ]];
-          then echo $BRANCH_REG;
-          else echo 'master'; fi
-        )
+      run: 'echo ::set-output name=frontend-branch::$(BRANCH_REG=$(echo $PRBODY|tr -d ''\n''|sed -E ''s/(.*)front branch: \[(.*)\](.*)/\2/g'');if [[ $BRANCH_REG =~ [0-z]+ ]];then echo $BRANCH_REG;else echo ''master''; fi)'
       env:
         PRBODY: ${{ steps.PR.outputs.pr_body }}
 
+    - name: Create commit comment
+      uses: peter-evans/commit-comment@v1
+      with:
+        body: Frontend integrity CI runs using branch reparcar-frontend-next/**${{ steps.get-frontend-branch.outputs.frontend-branch }}**
     - name: Checkout frontend
       uses: actions/checkout@v3
       with:
