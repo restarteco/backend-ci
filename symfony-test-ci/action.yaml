@@ -91,18 +91,26 @@ runs:
     - name: Create DB
       run: bin/console doctrine:database:create --no-interaction
       shell: bash
+      env:
+        DATABASE_URL: ${{inputs.database_url}}
 
     ## —— DATABASE SCHEMA —————————————————————————————————————————————————————————————
     - name: Create DB schema
       run: bin/console doctrine:migrations:migrate --no-interaction
       shell: bash
+      env:
+        DATABASE_URL: ${{inputs.database_url}}
 
     ## —— Tests ✅ ———————————————————————————————————————————————————————————
     # We use the dev env here
     - name: Load Doctrine fixtures
       run: bin/console hautelook:fixtures:load --no-interaction
       shell: bash
+      env:
+        DATABASE_URL: ${{inputs.database_url}}
 
     - name: Run functionnal and unit tests
       run: vendor/bin/phpunit
       shell: bash
+      env:
+        DATABASE_URL: ${{inputs.database_url}}
