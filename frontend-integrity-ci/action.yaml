@@ -23,7 +23,7 @@ runs:
     - uses: 8BitJonny/gh-get-current-pr@1.4.0
       id: PR
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        github-token: ${{ inputs.token }}
         sha: ${{ github.event.pull_request.head.sha }}
         filterOutClosed: true
     - name: get frontend branch from pr comment
