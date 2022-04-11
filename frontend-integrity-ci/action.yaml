@@ -1,15 +1,21 @@
 name: CI / Test frontend integrity
 description: Check frontend integrity
+
 inputs:
   token:
     description: 'The GitHub authentication token'
+    required: false
     default: ${{ github.token }}
   auth_json:
-    description: 'The auth.json (for other bundles)'
-    default: ''
+    description: 'The auth.json content (for other bundles)'
+    required: true
+
 runs:
   using: 'composite'
   steps:
+
+    # Backend MS
+
     - name: Checkout
       uses: actions/checkout@v3
       with:
@@ -19,36 +25,6 @@ runs:
       shell: bash
       run: echo '${{ inputs.auth_json }}' > auth.json
       working-directory: ./main
-
-    - uses: 8BitJonny/gh-get-current-pr@1.4.0
-      id: PR
-      with:
-        github-token: ${{ inputs.token }}
-        sha: ${{ github.event.pull_request.head.sha }}
-        filterOutClosed: true
-    - name: get frontend branch from pr comment
-      shell: bash
-      id: get-frontend-branch
-      run: 'echo ::set-output name=frontend-branch::$(BRANCH_REG=$(echo $PRBODY|tr -d ''\n''|sed -E ''s/(.*)front branch: \[(.*)\](.*)/\2/g'');if [[ $BRANCH_REG =~ ^[0-z_/\.-]+$ ]];then echo $BRANCH_REG;else echo ''master''; fi)'
-      env:
-        PRBODY: ${{ steps.PR.outputs.pr_body }}
-
-    - name: Create commit comment
-      uses: peter-evans/commit-comment@v1
-      with:
-        body: Frontend integrity CI runs using branch reparcar-frontend-next/**${{ steps.get-frontend-branch.outputs.frontend-branch }}**
-    - name: Checkout frontend
-      uses: actions/checkout@v3
-      with:
-        repository: restarteco/reparcar-front-next
-        ref: ${{ steps.get-frontend-branch.outputs.frontend-branch }}
-        token: ${{ inputs.token }}
-        path: ./frontend
-
-    - name: Use Node 12.22.6
-      uses: actions/setup-node@v2
-      with:
-        node-version: '12.22.6'
 
     - name: Setup PHP, extensions and composer with shivammathur/setup-php
       uses: shivammathur/setup-php@v2
@@ -65,20 +41,84 @@ runs:
       working-directory: ./main
 
     - name: Cache composer dependencies
-      uses: actions/cache@v1
+      uses: actions/cache@v2
       id: composer-cache
       with:
         path: ${{ steps.composer-cache-dir.outputs.dir }}
         key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
         restore-keys: ${{ runner.os }}-composer-
 
+    - name: Install Composer dependencies
+      shell: bash
+      run: composer install
+      working-directory: ./main
+
+    - name: Export GraphQL types
+      shell: bash
+      run: echo $(bin/console api:graphql:export) > ../schema.graphql
+      working-directory: ./main
+
+    # Use cache on schema.graphql to see if there is changes
+
+    - name: Cache generated schema.graphql
+      uses: actions/cache@v2
+      id: schema-graphql-cache
+      with:
+        path: ./schema.graphql
+        key: schema-graphql-${{ hashFiles('**/schema.graphql') }}
+        restore-keys: |
+          schema-graphql-${{ hashFiles('**/schema.graphql') }}
+          schema-graphql-
+
+    # Frontend
+    # Do nothing if schema.graphql did not change
+
+    - uses: 8BitJonny/gh-get-current-pr@1.4.0
+      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
+      id: PR
+      with:
+        github-token: ${{ inputs.token }}
+        sha: ${{ github.event.pull_request.head.sha }}
+        filterOutClosed: true
+
+    - name: Get frontend branch from PR description
+      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
+      shell: bash
+      id: get-frontend-branch
+      run: 'echo ::set-output name=frontend-branch::$(BRANCH_REG=$(echo $PRBODY|tr -d ''\n''|sed -E ''s/(.*)front branch: \[(.*)\](.*)/\2/g'');if [[ $BRANCH_REG =~ ^[0-z_/\.-]+$ ]];then echo $BRANCH_REG;else echo ''master''; fi)'
+      env:
+        PRBODY: ${{ steps.PR.outputs.pr_body }}
+
+    - name: Create commit comment
+      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
+      uses: peter-evans/commit-comment@v1
+      with:
+        body: Frontend integrity CI runs using branch reparcar-frontend-next/**${{ steps.get-frontend-branch.outputs.frontend-branch }}**
+
+    - name: Checkout frontend
+      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+        repository: restarteco/reparcar-front-next
+        ref: ${{ steps.get-frontend-branch.outputs.frontend-branch }}
+        token: ${{ inputs.token }}
+        path: ./frontend
+
+    - name: Use Node 12.22.6
+      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
+      uses: actions/setup-node@v2
+      with:
+        node-version: '12.22.6'
+
     - name: Frontend - Get yarn cache directory
+      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
       id: yarn-cache-dir-path
       shell: bash
       run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
       working-directory: ./frontend
 
     - name: Frontend - Cache dependencies
+      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
       uses: actions/cache@v2
       id: yarn-cache
       with:
@@ -87,28 +127,21 @@ runs:
         restore-keys: |
           ${{ runner.os }}-yarn-
 
-    - name: Install Composer dependencies
-      shell: bash
-      run: composer install
-      working-directory: ./main
-
     - name: Frontend - Install dependencies
+      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
       shell: bash
       run: yarn install --immutable
       working-directory: ./frontend
 
-    - name: Export GraphQL types
-      shell: bash
-      run: echo $(bin/console api:graphql:export) > ../schema.graphql
-      working-directory: ./main
-
     - name: Frontend - Generate code from GraphQL
+      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
       shell: bash
       # Frontend package MUST be named as @reparcar/network-{MS_name}
       run: yarn workspace @reparcar/network-${{ github.event.repository.name }} graphql-gen-ci ../../../schema.graphql
       working-directory: ./frontend
 
     - name: Frontend - Check types
+      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: yarn workspaces foreach run type-check
+      run: yarn workspaces foreach run type-check-ci
       working-directory: ./frontend
