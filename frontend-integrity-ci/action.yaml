@@ -41,7 +41,7 @@ runs:
       working-directory: ./main
 
     - name: Cache composer dependencies
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       id: composer-cache
       with:
         path: ${{ steps.composer-cache-dir.outputs.dir }}
@@ -58,23 +58,8 @@ runs:
       run: echo $(bin/console api:graphql:export) > ../schema.graphql
       working-directory: ./main
 
-    # Use cache on schema.graphql to see if there is changes
-
-    - name: Cache generated schema.graphql
-      uses: actions/cache@v2
-      id: schema-graphql-cache
-      with:
-        path: ./schema.graphql
-        key: schema-graphql-${{ hashFiles('**/schema.graphql') }}
-        restore-keys: |
-          schema-graphql-${{ hashFiles('**/schema.graphql') }}
-          schema-graphql-
-
-    # Frontend
-    # Do nothing if schema.graphql did not change
-
-    - uses: 8BitJonny/gh-get-current-pr@1.4.0
-      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
+    - name: Get PR infos
+      uses: 8BitJonny/gh-get-current-pr@1.4.0
       id: PR
       with:
         github-token: ${{ inputs.token }}
@@ -82,12 +67,26 @@ runs:
         filterOutClosed: true
 
     - name: Get frontend branch from PR description
-      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
       shell: bash
       id: get-frontend-branch
       run: 'echo ::set-output name=frontend-branch::$(BRANCH_REG=$(echo $PRBODY|tr -d ''\n''|sed -E ''s/(.*)front branch: \[(.*)\](.*)/\2/g'');if [[ $BRANCH_REG =~ ^[0-z_/\.-]+$ ]];then echo $BRANCH_REG;else echo ''master''; fi)'
       env:
         PRBODY: ${{ steps.PR.outputs.pr_body }}
+
+    # Use cache on schema.graphql to see if there is changes
+    # Cache by schema.graphql content and frontend branch name
+
+    - name: Cache generated schema.graphql
+      uses: actions/cache@v3
+      id: schema-graphql-cache
+      with:
+        path: ./schema.graphql
+        key: schema-graphql-${{ hashFiles('**/schema.graphql') }}-${{ steps.get-frontend-branch.outputs.frontend-branch }}
+        restore-keys: |
+          schema-graphql-${{ hashFiles('**/schema.graphql') }}-${{ steps.get-frontend-branch.outputs.frontend-branch }}
+
+    # Frontend
+    # Do nothing if schema.graphql did not change
 
     - name: Create commit comment
       if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
@@ -119,7 +118,7 @@ runs:
 
     - name: Frontend - Cache dependencies
       if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       id: yarn-cache
       with:
         path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
