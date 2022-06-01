@@ -14,12 +14,37 @@ runs:
   using: 'composite'
   steps:
 
-    # Backend MS
-
     - name: Checkout
       uses: actions/checkout@v3
       with:
         path: ./main
+
+    # Checkout frontend
+
+    - name: Get PR infos
+      uses: 8BitJonny/gh-get-current-pr@1.4.0
+      id: PR
+      with:
+        github-token: ${{ inputs.token }}
+        sha: ${{ github.event.pull_request.head.sha }}
+        filterOutClosed: true
+
+    - name: Get frontend branch from PR description
+      shell: bash
+      id: get-frontend-branch
+      run: 'echo ::set-output name=frontend-branch::$(BRANCH_REG=$(echo $PRBODY|tr -d ''\n''|sed -E ''s/(.*)front branch: \[(.*)\](.*)/\2/g'');if [[ $BRANCH_REG =~ ^[0-z_/\.-]+$ ]];then echo $BRANCH_REG;else echo ''master''; fi)'
+      env:
+        PRBODY: ${{ steps.PR.outputs.pr_body }}
+
+    - name: Checkout frontend
+      uses: actions/checkout@v3
+      with:
+        repository: restarteco/reparcar-front-next
+        ref: ${{ steps.get-frontend-branch.outputs.frontend-branch }}
+        token: ${{ inputs.token }}
+        path: ./frontend
+
+    # Backend MS
 
     - name: Add git auth JSON file
       shell: bash
@@ -53,25 +78,10 @@ runs:
       run: composer install
       working-directory: ./main
 
-    - name: Export GraphQL types
+    - name: Export GraphQL schema to frontend
       shell: bash
-      run: echo $(bin/console api:graphql:export) > ../schema.graphql
+      run: echo $(bin/console api:graphql:export) > ../frontend/packages/reparcar-network-${{ github.event.repository.name }}/schema.graphql
       working-directory: ./main
-
-    - name: Get PR infos
-      uses: 8BitJonny/gh-get-current-pr@1.4.0
-      id: PR
-      with:
-        github-token: ${{ inputs.token }}
-        sha: ${{ github.event.pull_request.head.sha }}
-        filterOutClosed: true
-
-    - name: Get frontend branch from PR description
-      shell: bash
-      id: get-frontend-branch
-      run: 'echo ::set-output name=frontend-branch::$(BRANCH_REG=$(echo $PRBODY|tr -d ''\n''|sed -E ''s/(.*)front branch: \[(.*)\](.*)/\2/g'');if [[ $BRANCH_REG =~ ^[0-z_/\.-]+$ ]];then echo $BRANCH_REG;else echo ''master''; fi)'
-      env:
-        PRBODY: ${{ steps.PR.outputs.pr_body }}
 
     # Use cache on schema.graphql to see if there is changes
     # Cache by schema.graphql content and frontend branch name
@@ -80,10 +90,10 @@ runs:
       uses: actions/cache@v3
       id: schema-graphql-cache
       with:
-        path: ./schema.graphql
-        key: schema-graphql-${{ hashFiles('**/schema.graphql') }}-${{ steps.get-frontend-branch.outputs.frontend-branch }}
+        path: ./frontend/packages/reparcar-network-${{ github.event.repository.name }}/schema.graphql
+        key: schema-graphql-${{ hashFiles('frontend/packages/reparcar-network-${{ github.event.repository.name }}/schema.graphql') }}-${{ steps.get-frontend-branch.outputs.frontend-branch }}
         restore-keys: |
-          schema-graphql-${{ hashFiles('**/schema.graphql') }}-${{ steps.get-frontend-branch.outputs.frontend-branch }}
+          schema-graphql-${{ hashFiles('frontend/packages/reparcar-network-${{ github.event.repository.name }}/schema.graphql') }}-${{ steps.get-frontend-branch.outputs.frontend-branch }}
 
     # Frontend
     # Do nothing if schema.graphql did not change
@@ -94,53 +104,21 @@ runs:
       with:
         body: Frontend integrity CI runs using branch reparcar-frontend-next/**${{ steps.get-frontend-branch.outputs.frontend-branch }}**
 
-    - name: Checkout frontend
-      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: restarteco/reparcar-front-next
-        ref: ${{ steps.get-frontend-branch.outputs.frontend-branch }}
-        token: ${{ inputs.token }}
-        path: ./frontend
-
     - name: Use Node 12.22.6
       if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
       uses: actions/setup-node@v2
       with:
         node-version: '12.22.6'
 
-    - name: Frontend - Get yarn cache directory
-      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
-      id: yarn-cache-dir-path
-      shell: bash
-      run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
-      working-directory: ./frontend
-
-    - name: Frontend - Cache dependencies
-      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
-      uses: actions/cache@v3
-      id: yarn-cache
-      with:
-        path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-        key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-yarn-
-
-    - name: Frontend - Install dependencies
-      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
-      shell: bash
-      run: yarn install --immutable
-      working-directory: ./frontend
-
     - name: Frontend - Generate code from GraphQL
       if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
       shell: bash
       # Frontend package MUST be named as @reparcar/network-{MS_name}
-      run: yarn workspace @reparcar/network-${{ github.event.repository.name }} graphql-gen-ci ../../../schema.graphql
+      run: yarn workspace @reparcar/network-${{ github.event.repository.name }} gen:graphql:ts
       working-directory: ./frontend
 
     - name: Frontend - Check types
       if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: yarn workspaces foreach run type-check-ci
+      run: yarn c:type
       working-directory: ./frontend
