@@ -83,42 +83,25 @@ runs:
       run: echo $(bin/console api:graphql:export) > ../frontend/packages/reparcar-network-${{ github.event.repository.name }}/schema.graphql
       working-directory: ./main
 
-    # Use cache on schema.graphql to see if there is changes
-    # Cache by schema.graphql content and frontend branch name
-
-    - name: Cache generated schema.graphql
-      uses: actions/cache@v3
-      id: schema-graphql-cache
-      with:
-        path: ./frontend/packages/reparcar-network-${{ github.event.repository.name }}/schema.graphql
-        key: schema-graphql-${{ hashFiles('frontend/packages/reparcar-network-${{ github.event.repository.name }}/schema.graphql') }}-${{ steps.get-frontend-branch.outputs.frontend-branch }}
-        restore-keys: |
-          schema-graphql-${{ hashFiles('frontend/packages/reparcar-network-${{ github.event.repository.name }}/schema.graphql') }}-${{ steps.get-frontend-branch.outputs.frontend-branch }}
-
     # Frontend
-    # Do nothing if schema.graphql did not change
 
     - name: Create commit comment
-      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
       uses: peter-evans/commit-comment@v1
       with:
         body: Frontend integrity CI runs using branch reparcar-frontend-next/**${{ steps.get-frontend-branch.outputs.frontend-branch }}**
 
-    - name: Use Node 12.22.6
-      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
-      uses: actions/setup-node@v2
+    - name: Use Node - version defined by frontend
+      uses: actions/setup-node@v3
       with:
-        node-version: '12.22.6'
+        node-version-file: ./frontend/.nvmrc
 
     - name: Frontend - Generate code from GraphQL
-      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
       shell: bash
       # Frontend package MUST be named as @reparcar/network-{MS_name}
       run: yarn workspace @reparcar/network-${{ github.event.repository.name }} gen:graphql:ts
       working-directory: ./frontend
 
     - name: Frontend - Check types
-      if: steps.schema-graphql-cache.outputs.cache-hit != 'true'
       shell: bash
       run: yarn c:type
       working-directory: ./frontend
