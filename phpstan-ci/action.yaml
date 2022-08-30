@@ -1,8 +1,9 @@
 name: CI / PhpStan
 description: 'Run Php Stan'
-token:
-    description: 'The GitHub authentication token'
-    default: ${{ github.token }}
+inputs:
+  token:
+      description: 'The GitHub authentication token'
+      default: ${{ github.token }}
 runs:
   using: 'composite'
   steps:
