@@ -1,11 +1,14 @@
 name: CI / PhpStan
 description: 'Run Php Stan'
-
+token:
+    description: 'The GitHub authentication token'
+    default: ${{ github.token }}
 runs:
   using: 'composite'
   steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with: ${{ inputs.token }}
 
       - uses: shivammathur/setup-php@v2
         with:
