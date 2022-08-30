@@ -1,9 +1,12 @@
-name: CI / Rector
-description: 'Run Php stan'
+name: CI / PhpStan
+description: 'Run Php Stan'
 inputs:
   token:
     description: 'The GitHub authentication token'
     default: ${{ github.token }}
+  auth_json:
+    description: 'The auth.json (for other bundles)'
+    default: ''
 runs:
   using: 'composite'
   steps:
@@ -14,6 +17,10 @@ runs:
           ref: ${{ github.event.pull_request.head.ref }}
           # Must be used to trigger workflow after push
           token: ${{ inputs.token }}
+
+      - name: Add AUTH JSON
+        shell: bash
+        run: echo '${{ inputs.auth_json }}' > auth.json
 
       - uses: shivammathur/setup-php@v2
         with:
