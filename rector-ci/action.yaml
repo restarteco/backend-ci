@@ -29,7 +29,7 @@ runs:
       - run: composer install --no-progress --ansi
         shell: bash
 
-      - run: vendor/bin/phpstan analyze src/
+      - run: vendor/bin/phpstan analyze -l 9 src/
         shell: bash
         id: phpstan-check
 
