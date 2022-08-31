@@ -15,7 +15,7 @@ jobs:
     # run only on commits on main repository, not on forks
     if: github.event.pull_request.head.repo.full_name == github.repository
     steps:
-      - uses: restarteco/backend-ci/rector-ci@v2
+      - uses: restarteco/backend-ci/rector-ci@v3.3.1
         with:
           token: ${{ secrets.ACCESS_TOKEN_RECTOR }} # default ${{ github.token }}
           auth_json: ${{ secrets.ACCESS_AUTH }} # optional
